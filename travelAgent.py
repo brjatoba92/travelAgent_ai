@@ -1,8 +1,16 @@
 import os
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.agent_toolkits.load_tools import load_tools
 from langchain.agents import create_react_agent, AgentExecutor
 from langchain import hub
+
+from langchain_community.document_loaders import WebBaseLoader
+from langchain_community.vectorstores import Chroma
+import bs4
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+
+
 
 
 llm = ChatOpenAI(model="gpt-3.5-turbo")
@@ -20,4 +28,24 @@ def reserchAgent(query, llm):
     webContext = agent_executor.invoke({"input": query})
     return webContext['output']
 
-print(reserchAgent(query, llm))
+# print(reserchAgent(query, llm))
+
+
+def loadData():
+    loader = WebBaseLoader(
+        webpaths=("https://www.dicasdeviagem.com/alemanha/"),
+        bs_kwargs=dict(parse_only=bs4.SoapStrainer(class_=("postcontentwrap", "pagetitleloading background-imaged loading-dark")))
+    )
+    docs = loader.load()
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    splits = text_splitter.split_documents(docs)
+    vectorstore = Chroma.from_documents(documents=splits, embedding=OpenAIEmbeddings)
+    retriever = vectorstore.as_retriever()
+    return retriever
+
+
+def getRelevantDocs(query):
+    retriever =loadData()
+    relevant_documents = retriever.invoke(query)
+    return relevant_documents
+
